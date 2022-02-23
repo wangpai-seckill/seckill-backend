@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <!-- 此部分不能使用 <properties/...> 中的元素来取代，必须直接给出具体的内容  -->
+        <version>2.6.3</version>
+    </parent>
+
+    <groupId>org.wangpai.seckill</groupId>
+    <artifactId>seckill-backend</artifactId>
+    <version>M.0.0</version>
+    <name>seckill-backend</name>
+    <description>seckill-backend</description>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>seckill-springboot</module>
+        <module>seckill-view</module>
+        <module>seckill-common</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+
+        <!-- 凡是自定义的属性，都要加 .custom 后缀，以防与已有的预置属性相冲突 -->
+        <project.version.custom>M.0.0</project.version.custom>
+
+        <junit.version.custom>5.8.0-M1</junit.version.custom>
+        <lombok.version.custom>1.18.20</lombok.version.custom>
+        <slf4j.version.custom>1.7.13</slf4j.version.custom>
+        <mybatis-springboot.version.custom>2.2.0</mybatis-springboot.version.custom>
+        <mysql.version.custom>8.0.27</mysql.version.custom>
+        <jackson.version.custom>2.13.1</jackson.version.custom>
+        <commons-pool2.version.custom>2.11.1</commons-pool2.version.custom>
+        <commons-lang3.version.custom>3.12.0</commons-lang3.version.custom>
+        <commons-codec.version.custom>1.15</commons-codec.version.custom>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.wangpai.seckill</groupId>
+                <artifactId>seckill-springboot</artifactId>
+                <version>${project.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wangpai.seckill</groupId>
+                <artifactId>seckill-view</artifactId>
+                <version>${project.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wangpai.seckill</groupId>
+                <artifactId>seckill-common</artifactId>
+                <version>${project.version.custom}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version.custom}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version.custom}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis-springboot.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>${mysql.version.custom}</version>
+            </dependency>
+            <!-- 提供对 Redis 中 Lettuce 连接池的支持 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-pool2</artifactId>
+                <version>${commons-pool2.version.custom}</version>
+            </dependency>
+            <!-- 提供一些工具方法的支持 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version.custom}</version>
+            </dependency>
+            <!-- 提供解码等的支持 -->
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>${commons-codec.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version.custom}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version.custom}</version>
+            </dependency>
+            <!-- 提供对日期转换的支持 -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson.version.custom}</version>
+            </dependency>
+
+        </dependencies>
+
+    </dependencyManagement>
+
+</project>
