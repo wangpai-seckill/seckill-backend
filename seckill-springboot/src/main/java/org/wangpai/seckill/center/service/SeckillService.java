@@ -6,6 +6,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.wangpai.seckill.center.manager.DealManager;
+import org.wangpai.seckill.center.manager.UserManager;
 import org.wangpai.seckill.center.service.pojo.SeckillProductState;
 import org.wangpai.seckill.center.service.pojo.SeckillRequest;
 import org.wangpai.seckill.center.service.pojo.SeckillResult;
@@ -14,8 +16,11 @@ import org.wangpai.seckill.exception.CannotFindSeckillException;
 import org.wangpai.seckill.exception.CannotOpSeckillException;
 import org.wangpai.seckill.middleware.cache.type.CacheType;
 import org.wangpai.seckill.middleware.cache.util.CacheUtil;
+import org.wangpai.seckill.middleware.lock.DistributedLockFactory;
+import org.wangpai.seckill.middleware.lock.LockType;
 import org.wangpai.seckill.middleware.mq.seckill.SeckillMsgSender;
 import org.wangpai.seckill.persistence.complex.dao.ProductDao;
+import org.wangpai.seckill.persistence.origin.domain.Product;
 import org.wangpai.seckill.persistence.origin.mapper.ProductMapper;
 import org.wangpai.seckill.time.TimeUtil;
 import org.wangpai.seckill.util.IdUtil;
@@ -38,19 +43,19 @@ public class SeckillService {
 
     private final ProductDao productDao;
 
-    private final UserService userService;
+    private final UserManager userManager;
 
-    private final DealService dealService;
+    private final DealManager dealManager;
 
     private final SeckillMsgSender mq;
 
     public SeckillService(ProductMapper productMapper, ProductDao productDao,
-                          UserService userService, DealService dealService,
+                          UserManager userManager, DealManager dealManager,
                           SeckillMsgSender seckillMsgSender) {
         this.productMapper = productMapper;
         this.productDao = productDao;
-        this.userService = userService;
-        this.dealService = dealService;
+        this.userManager = userManager;
+        this.dealManager = dealManager;
         this.mq = seckillMsgSender;
     }
 
@@ -128,7 +133,7 @@ public class SeckillService {
     public SeckillResult getSeckillResultWithoutCookies(HttpServletRequest request, HttpServletResponse response,
                                                         String userPhone, String requestId)
             throws JsonProcessingException {
-        var user = this.userService.getLoginData(request, response, userPhone).getUser();
+        var user = this.userManager.getLoginData(request, response, userPhone).getUser();
         if (user == null) {
             // 如果通过手机号查找不到 User，说明不是源自本人的查询
             return new SeckillResult().setResult(FAIL).setReason("请求非法");
@@ -147,20 +152,73 @@ public class SeckillService {
     @Transactional
     public SeckillService seckill(SeckillRequest seckillRequest)
             throws CannotFindSeckillException, CannotOpSeckillException, JsonProcessingException {
+        final var spinTime = 1; // 自旋时间，单位：秒
         var productId = seckillRequest.getProductId();
-        var product = this.productMapper.search(productId);
-        if (product == null) {
-            throw new CannotFindSeckillException("找不到该商品");
+        Product product = null;
+        var lock = DistributedLockFactory.getDistributedLock(LockType.PRODUCT_LOCK, productId);
+        try {
+            int count = 0;
+            // 获取分布式锁
+            while (!lock.tryLock()) {
+                try {
+                    Thread.sleep(spinTime * 1000);
+                } catch (InterruptedException exception) {
+                    exception.printStackTrace();
+                }
+
+                var productState = CacheUtil.get(productId,
+                        SECKILL_PRODUCT_STATE, SeckillProductState.class);
+                // 此处不需要使用条件 productState != null，因为下面的条件中已包含
+                if (productState == CLOSED) {
+                    System.out.println("第" + (++count) + "次没有拿到锁，但秒杀已结束");
+                    throw new CannotOpSeckillException("商品库存不够，无法减少");
+                }
+
+                System.out.println("第" + (++count) + "次没有拿到锁，尝试下一次");
+            }
+            System.out.println("得到分布式锁");
+
+            var productState = CacheUtil.get(productId,
+                    SECKILL_PRODUCT_STATE, SeckillProductState.class);
+            // 此处不需要使用条件 productState != null，因为下面的条件中已包含
+            if (productState == CLOSED) {
+                System.out.println("得到分布式锁，但秒杀已结束");
+                throw new CannotOpSeckillException("商品库存不够，无法减少");
+            }
+
+            System.out.println("得到分布式锁，秒杀可能没有结束");
+
+            product = this.productMapper.search(productId);
+            if (product == null) {
+                throw new CannotFindSeckillException("找不到该商品");
+            }
+            int productRestNum = product.getInventoryQuantity();
+            /**
+             * 如果库存为 1 或 0，在缓存中标记该商品已秒杀结束。
+             * 因为商品有可能一开始就为 0，所以这里也要设置一次秒杀结束状态
+             */
+            if (productRestNum == 1 || productRestNum == 0) {
+                CacheUtil.set(productId, CLOSED, CacheType.SECKILL_PRODUCT_STATE, SECKILL_REQUEST_DURATION);
+            }
+            if (productRestNum < 0) {
+                System.out.println("致命错误：商品超卖");
+            }
+
+            if (productRestNum <= 0) {
+                throw new CannotOpSeckillException("商品库存不够，无法减少");
+            }
+
+            this.productDao.reduceStock(productId);
+        } finally {
+
+            System.out.println("尝试释放分布式锁");
+            // 无论前面是否抛出异常，此处都要释放锁。这不会释放别人的锁
+            lock.unlock();
         }
-        if (product.getInventoryQuantity() <= 0) {
-            throw new CannotOpSeckillException("商品库存不够，无法减少");
-        }
-        this.productDao.reduceStock(productId);
-        this.dealService.createDeal(seckillRequest);
-        // 如果库存为 0，在缓存中标记该商品的状态
-        if (product.getInventoryQuantity() == 0) {
-            CacheUtil.set(productId, CLOSED, CacheType.SECKILL_PRODUCT_STATE, SECKILL_REQUEST_DURATION);
-        }
+
+        // 此操作不需要上锁
+        this.dealManager.createDeal(seckillRequest);
+
         return this;
     }
 }

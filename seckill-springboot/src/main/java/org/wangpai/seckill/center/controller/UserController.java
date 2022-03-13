@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.wangpai.seckill.center.manager.UserManager;
 import org.wangpai.seckill.center.response.RspMsg;
 import org.wangpai.seckill.center.service.UserService;
 import org.wangpai.seckill.center.session.SessionUtil;
@@ -28,8 +29,11 @@ import static org.wangpai.seckill.center.response.RspState.SUCCESS;
 public class UserController {
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    private final UserManager userManager;
+
+    public UserController(UserService userService, UserManager userManager) {
         this.userService = userService;
+        this.userManager = userManager;
     }
 
     /**
@@ -45,7 +49,7 @@ public class UserController {
         System.out.println("login called");
         System.out.println("session id：" + SessionUtil.getSessionId(request));
 
-        var loginData = this.userService.getLoginData(request, response, loginVo.getPhone());
+        var loginData = this.userManager.getLoginData(request, response, loginVo.getPhone());
         var user = loginData.getUser();
         if (user == null) {
             // 如果通过手机号查找不到 User，说明提供的手机号不正确

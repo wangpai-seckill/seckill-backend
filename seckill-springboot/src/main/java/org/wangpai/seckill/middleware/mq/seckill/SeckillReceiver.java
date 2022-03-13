@@ -35,6 +35,8 @@ public class SeckillReceiver {
             this.seckillService.seckill(seckillRequest);
         } catch (CannotFindSeckillException | CannotOpSeckillException exception) {
             seckillResult.setResult(FAIL).setReason(exception.getMessage());
+            CacheUtil.set(seckillResult.getRequestId(), seckillResult, SECKILL_REQUEST, SECKILL_REQUEST_DURATION);
+            return;
         }
 
         // 为了减少对象的创建，这里选择重用前面的 SeckillResult 对象
